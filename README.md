@@ -20,7 +20,7 @@ Quick start (TRL)
 3) DecisionObject path (PPA-style):
    - Generate or use the provided dataset: `python3 examples/generate_mock_rl_dataset.py --output examples/mock_rl_dataset.jsonl --count 500`
    - Validate against the KG: `python3 examples/validate_dataset.py --data examples/mock_rl_dataset.jsonl --kg examples/synthetic_kg.json`
-   - Optional: synthesize utterances with an LLM instead of templates by adding `--use-llm --llm-model <model>` (requires an OpenAI-compatible client, API key in `OPENAI_API_KEY` or a custom env var via `--llm-api-key-env`).
+   - Optional: synthesize utterances with an LLM via liteLLM by adding `--use-llm --llm-model <model>` (OpenAI-compatible; set API key in `LITELLM_API_KEY` or `OPENAI_API_KEY`, custom base via `--llm-base-url`).
    - Load and train:
      ```python
      from examples.trl_integration import build_trl_grpo_trainer, load_decision_dataset

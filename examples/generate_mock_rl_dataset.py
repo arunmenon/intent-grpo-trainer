@@ -241,27 +241,33 @@ def dedup(seq: Iterable[str]) -> List[str]:
 
 class LLMGenerator:
     """
-    Optional LLM-backed utterance generator. Requires openai-compatible SDK and API key.
+    Optional LLM-backed utterance generator using liteLLM (model-agnostic, OpenAI-compatible).
     """
 
     def __init__(
         self,
         model: str,
         base_url: Optional[str] = None,
-        api_key_env: str = "OPENAI_API_KEY",
+        api_key_env: str = "LITELLM_API_KEY",
+        fallback_api_key_env: str = "OPENAI_API_KEY",
         temperature: float = 0.8,
         max_tokens: int = 80,
     ):
         try:
-            from openai import OpenAI  # type: ignore
+            import litellm  # type: ignore
         except ImportError as exc:
-            raise RuntimeError("openai package is required for LLM generation") from exc
+            raise RuntimeError("liteLLM is required for LLM generation (pip install litellm)") from exc
 
-        api_key = os.getenv(api_key_env)
+        api_key = os.getenv(api_key_env) or os.getenv(fallback_api_key_env)
         if not api_key:
-            raise RuntimeError(f"API key not found in env var {api_key_env}")
+            raise RuntimeError(f"API key not found in env var {api_key_env} or {fallback_api_key_env}")
 
-        self.client = OpenAI(api_key=api_key, base_url=base_url)  # base_url None -> default
+        # Configure liteLLM globals.
+        litellm.api_key = api_key
+        if base_url:
+            litellm.api_base = base_url
+
+        self.litellm = litellm
         self.model = model
         self.temperature = temperature
         self.max_tokens = max_tokens
@@ -283,13 +289,13 @@ class LLMGenerator:
             f"Missing/ambiguous slots: {miss_text}\n"
             "Return only the user utterance."
         )
-        resp = self.client.chat.completions.create(
+        resp = self.litellm.completion(
             model=self.model,
             messages=[{"role": "system", "content": sys_prompt}, {"role": "user", "content": user_prompt}],
             temperature=self.temperature,
             max_tokens=self.max_tokens,
         )
-        return resp.choices[0].message.content.strip()
+        return resp["choices"][0]["message"]["content"].strip()
 
 
 def choose_intent_pair(noise_ratio: float) -> tuple[dict, dict, str]:
@@ -438,9 +444,9 @@ def main():
     parser.add_argument("--output", type=Path, default=Path("examples/mock_rl_dataset.jsonl"), help="JSONL output path.")
     parser.add_argument("--count", type=int, default=500, help="Number of examples to emit (default 500).")
     parser.add_argument("--use-llm", action="store_true", help="Use an LLM to generate utterances instead of templates.")
-    parser.add_argument("--llm-model", type=str, default="gpt-4o-mini", help="LLM model name (OpenAI-compatible).")
+    parser.add_argument("--llm-model", type=str, default="gpt-4o-mini", help="LLM model name (OpenAI-compatible via liteLLM).")
     parser.add_argument("--llm-base-url", type=str, default=None, help="Optional custom base URL for OpenAI-compatible endpoints.")
-    parser.add_argument("--llm-api-key-env", type=str, default="OPENAI_API_KEY", help="Env var holding the API key.")
+    parser.add_argument("--llm-api-key-env", type=str, default="LITELLM_API_KEY", help="Env var holding the primary API key (falls back to OPENAI_API_KEY).")
     parser.add_argument("--llm-temperature", type=float, default=0.8, help="LLM temperature.")
     parser.add_argument("--llm-max-tokens", type=int, default=80, help="Max tokens for LLM completion.")
     args = parser.parse_args()
