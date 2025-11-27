@@ -18,4 +18,8 @@ __all__ = [
     "replay_cache",
     "schedule",
     "trainer_scaffold",
+    "decision_schema",
+    "intent_reward",
+    "dataset",
+    "utils",
 ]

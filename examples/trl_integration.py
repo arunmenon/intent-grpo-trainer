@@ -17,6 +17,7 @@ from typing import List
 from trl import GRPOConfig, GRPOTrainer
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
+from grpo_intent.dataset import load_decision_jsonl
 from grpo_intent.reward_components import (
     reward_decision_type,
     reward_intent_similarity,
@@ -24,6 +25,7 @@ from grpo_intent.reward_components import (
     reward_question_coverage,
     reward_reasoning_quality,
 )
+from grpo_intent.intent_reward import DecisionRewardConfig, reward_decision_object
 
 
 def build_trl_grpo_trainer(
@@ -36,12 +38,19 @@ def build_trl_grpo_trainer(
     per_device_train_batch_size: int = 2,
     gradient_accumulation_steps: int = 1,
     report_to: str | None = "wandb",
+    reward_variant: str = "legacy",
+    decision_reward_config: DecisionRewardConfig = DecisionRewardConfig(),
 ) -> GRPOTrainer:
     """
     Construct a TRL GRPOTrainer with our reward functions attached.
 
     GRPOTrainer passes batch columns to reward functions via **kwargs. The
     wrappers below pull labels from kwargs so we don't guess trainer internals.
+
+    reward_variant:
+      - "legacy": uses the R1–R5 functions based on `final_intents` schema.
+      - "decision_object": uses the DecisionObject schema (decision_type,
+        picked_intents with path/intent_id, clarification_questions, reasoning_summary).
     """
 
     tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -94,7 +103,24 @@ def build_trl_grpo_trainer(
             key_terms=kwargs.get("reasoning_terms", []),
         )
 
-    reward_funcs: List = [r1, r2, r3, r4, r5]
+    def decision_reward(prompts, completions, **kwargs):
+        return reward_decision_object(
+            prompts=prompts,
+            completion_groups=completions,
+            gold_intents=kwargs.get("gold_intents"),
+            gold_decision=kwargs.get("gold_decision"),
+            known_paths=kwargs.get("known_paths"),
+            ambiguous_slots=kwargs.get("ambiguous_slots"),
+            reasoning_terms=kwargs.get("reasoning_terms"),
+            config=decision_reward_config,
+        )
+
+    if reward_variant == "decision_object":
+        reward_funcs: List = [decision_reward]
+    elif reward_variant == "legacy":
+        reward_funcs = [r1, r2, r3, r4, r5]
+    else:
+        raise ValueError(f"Unknown reward_variant: {reward_variant}")
 
     # ref_model is optional for GRPO; set to None if you don't want KL to a reference.
     trainer = GRPOTrainer(
@@ -111,3 +137,10 @@ def build_trl_grpo_trainer(
 # Usage sketch (replace train_dataset with your HF dataset with the expected columns):
 # trainer = build_trl_grpo_trainer("gpt2", train_dataset)
 # trainer.train()
+
+
+def load_decision_dataset(jsonl_path: str):
+    """
+    Convenience wrapper to load a DecisionObject JSONL via grpo_intent.dataset.
+    """
+    return load_decision_jsonl(jsonl_path)

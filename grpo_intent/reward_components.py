@@ -19,22 +19,7 @@ from .schema import (
     try_parse_completion,
     validate_intents_exist,
 )
-
-
-def _extract_text(completion: Any) -> str:
-    """Handle Unsloth/TRL completion formats (str or dict with content/text)."""
-    if isinstance(completion, str):
-        return completion
-    if isinstance(completion, dict):
-        if "content" in completion:
-            return str(completion["content"])
-        if "text" in completion:
-            return str(completion["text"])
-    return str(completion)
-
-
-def _clip(value: float, low: float, high: float) -> float:
-    return max(low, min(high, value))
+from .utils import clip_value, extract_text
 
 
 def _flatten(groups: List[List[Any]]) -> List[Any]:
@@ -91,7 +76,7 @@ def reward_json_and_path(
         )
 
         for completion in group:
-            text = _extract_text(completion)
+            text = extract_text(completion)
             parsed: ParsedOutput = try_parse_completion(text)
             score = 0.0
 
@@ -119,7 +104,7 @@ def reward_json_and_path(
                 jaccard = intersection / union if union > 0 else 0.0
                 score += settings.r1_match_weight * jaccard
 
-            scores.append(_clip(score, -settings.component_clip, settings.component_clip))
+            scores.append(clip_value(score, -settings.component_clip, settings.component_clip))
 
     return scores
 
@@ -135,7 +120,7 @@ def reward_decision_type(
     for idx, group in enumerate(completion_groups):
         correct = gold_decisions[idx] if idx < len(gold_decisions) else None
         for completion in group:
-            text = _extract_text(completion)
+            text = extract_text(completion)
             parsed = try_parse_completion(text)
             if parsed.decision_type is None or correct is None:
                 scores.append(settings.r2_incorrect)
@@ -158,7 +143,7 @@ def reward_intent_similarity(
         gold_list = list(gold_intents[idx]) if idx < len(gold_intents) else []
         gold_set = set(gold_list)
         for completion in group:
-            text = _extract_text(completion)
+            text = extract_text(completion)
             parsed = try_parse_completion(text)
             pred_list = parsed.final_intents
             pred_set = set(pred_list)
@@ -180,7 +165,7 @@ def reward_intent_similarity(
                 )
                 score += settings.r3_order_penalty * mismatches
 
-            scores.append(_clip(score, -settings.component_clip, settings.component_clip))
+            scores.append(clip_value(score, -settings.component_clip, settings.component_clip))
     return scores
 
 
@@ -199,7 +184,7 @@ def reward_question_coverage(
     for idx, group in enumerate(completion_groups):
         slots = [s.lower() for s in ambiguous_slots[idx]] if idx < len(ambiguous_slots) else []
         for completion in group:
-            text = _extract_text(completion)
+            text = extract_text(completion)
             parsed = try_parse_completion(text)
             if parsed.decision_type != "clarify":
                 scores.append(0.0)
@@ -214,7 +199,7 @@ def reward_question_coverage(
             else:
                 # No known ambiguity; neutral.
                 score = 0.0
-            scores.append(_clip(score, -settings.component_clip, settings.component_clip))
+            scores.append(clip_value(score, -settings.component_clip, settings.component_clip))
     return scores
 
 
@@ -233,13 +218,13 @@ def reward_reasoning_quality(
     for idx, group in enumerate(completion_groups):
         terms = [t.lower() for t in key_terms[idx]] if idx < len(key_terms) else []
         for completion in group:
-            text = _extract_text(completion)
+            text = extract_text(completion)
             parsed = try_parse_completion(text)
             reasoning = parsed.reasoning.lower()
             hit = sum(1 for term in terms if term in reasoning)
             miss = len(terms) - hit
             score = hit * settings.r5_keyword_reward - miss * settings.r5_miss_penalty if terms else 0.0
-            scores.append(_clip(score, -settings.component_clip, settings.component_clip))
+            scores.append(clip_value(score, -settings.component_clip, settings.component_clip))
     return scores
 
 
@@ -259,4 +244,4 @@ def sum_with_weights(components: List[List[float]], weights: Sequence[float], se
         for i, val in enumerate(comp):
             total[i] += weight * val
 
-    return [_clip(t, -settings.total_clip, settings.total_clip) for t in total]
+    return [clip_value(t, -settings.total_clip, settings.total_clip) for t in total]
