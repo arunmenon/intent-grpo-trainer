@@ -474,6 +474,7 @@ def main():
     parser = argparse.ArgumentParser(description="Generate mock RL dataset for DecisionObject reward.")
     parser.add_argument("--output", type=Path, default=Path("examples/mock_rl_dataset.jsonl"), help="JSONL output path.")
     parser.add_argument("--count", type=int, default=500, help="Number of examples to emit (default 500).")
+    parser.add_argument("--seed", type=int, default=RANDOM_SEED, help="RNG seed for reproducibility/diversity.")
     parser.add_argument("--use-llm", action="store_true", help="Use an LLM to generate utterances instead of templates.")
     parser.add_argument("--llm-model", type=str, default="gpt-4o-mini", help="LLM model name (OpenAI-compatible via liteLLM).")
     parser.add_argument("--llm-base-url", type=str, default=None, help="Optional custom base URL for OpenAI-compatible endpoints.")
@@ -482,9 +483,10 @@ def main():
     parser.add_argument("--llm-max-tokens", type=int, default=80, help="Max tokens for LLM completion.")
     parser.add_argument("--log-every", type=int, default=0, help="Print progress every N examples (0 to disable).")
     parser.add_argument("--llm-workers", type=int, default=1, help="Number of threads for LLM-backed generation (1 = sequential).")
+    parser.add_argument("--dedup-prompts", action="store_true", help="Drop duplicate prompts after generation.")
     args = parser.parse_args()
 
-    random.seed(RANDOM_SEED)
+    random.seed(args.seed)
     llm = None
     if args.use_llm:
         try:
@@ -500,6 +502,17 @@ def main():
             raise SystemExit(f"Failed to initialize LLM generator: {exc}") from exc
 
     dataset = build_dataset(args.count, llm, log_every=args.log_every, llm_workers=args.llm_workers)
+    if args.dedup_prompts:
+        seen = set()
+        deduped = []
+        for row in dataset:
+            if row["prompt"] in seen:
+                continue
+            seen.add(row["prompt"])
+            deduped.append(row)
+        if len(deduped) < len(dataset):
+            print(f"[dedup] removed {len(dataset) - len(deduped)} duplicates; {len(deduped)} remain.")
+        dataset = deduped
     save_jsonl(dataset, args.output)
 
     print(f"Wrote {len(dataset)} examples to {args.output}")
