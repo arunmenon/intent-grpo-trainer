@@ -39,3 +39,8 @@ Data + KG assets (DecisionObject path)
 - Dataset generator: `examples/generate_mock_rl_dataset.py` (curriculum buckets, plausible multi-intent pairs, optional LLM utterances, small noise ratio).
 - Sample dataset: `examples/mock_rl_dataset.jsonl` (500 rows, pick/clarify/multi_intent).
 - Dataset loader/validator: `grpo_intent/dataset.py`, `examples/validate_dataset.py`.
+
+GRPO runner script
+- Quick GPU run with DecisionObject rewards: `python scripts/run_decision_grpo.py --model-id gpt2 --dataset examples/mock_rl_dataset.jsonl --steps 50 --batch-size 1 --grad-accum 1 --reward-variant decision_object`
+- Install deps in your venv first: `pip install transformers trl datasets`
+- Script warns if CUDA isn’t available; add `--no-cuda-check` to skip. Uses TRL (no Unsloth wiring in this script).
