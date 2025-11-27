@@ -42,5 +42,5 @@ Data + KG assets (DecisionObject path)
 
 GRPO runner script
 - Quick GPU run with DecisionObject rewards: `python scripts/run_decision_grpo.py --model-id gpt2 --dataset examples/mock_rl_dataset.jsonl --steps 50 --batch-size 1 --grad-accum 1 --reward-variant decision_object`
-- Install deps in your venv first: `pip install transformers trl datasets`
+- Bootstrap venv + deps: `bash scripts/bootstrap_trainer_env.sh` (installs transformers/trl/datasets/litellm; install torch separately for your CUDA version).
 - Script warns if CUDA isn’t available; add `--no-cuda-check` to skip. Uses TRL (no Unsloth wiring in this script).
