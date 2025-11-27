@@ -19,7 +19,8 @@ Quick start (TRL)
    ```
 3) DecisionObject path (PPA-style):
    - Generate or use the provided dataset: `python3 examples/generate_mock_rl_dataset.py --output examples/mock_rl_dataset.jsonl --count 500`
-   - Validate against the KG: `python3 examples/validate_dataset.py --data examples/mock_rl_dataset.jsonl --kg examples/mock_kg.json`
+   - Validate against the KG: `python3 examples/validate_dataset.py --data examples/mock_rl_dataset.jsonl --kg examples/synthetic_kg.json`
+   - Optional: synthesize utterances with an LLM instead of templates by adding `--use-llm --llm-model <model>` (requires an OpenAI-compatible client, API key in `OPENAI_API_KEY` or a custom env var via `--llm-api-key-env`).
    - Load and train:
      ```python
      from examples.trl_integration import build_trl_grpo_trainer, load_decision_dataset
@@ -33,7 +34,7 @@ Custom loop option
 If you need cache mixing or custom scheduling, `grpo_intent/trainer_scaffold.py` and `examples/hook_template.py` show how to plug in your own generate/update hooks.
 
 Data + KG assets (DecisionObject path)
-- KG spec: `examples/mock_kg.json` (12 PPA-relevant intents with paths, required/optional slots, clarification templates).
-- Dataset generator: `examples/generate_mock_rl_dataset.py` (curriculum buckets, plausible multi-intent pairs, small noise ratio).
+- KG spec: `examples/synthetic_kg.json` (12 PPA-relevant intents with paths, required/optional slots, clarification templates).
+- Dataset generator: `examples/generate_mock_rl_dataset.py` (curriculum buckets, plausible multi-intent pairs, optional LLM utterances, small noise ratio).
 - Sample dataset: `examples/mock_rl_dataset.jsonl` (500 rows, pick/clarify/multi_intent).
 - Dataset loader/validator: `grpo_intent/dataset.py`, `examples/validate_dataset.py`.

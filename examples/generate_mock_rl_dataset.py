@@ -30,17 +30,18 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import random
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Dict, Iterable, List, Sequence, Tuple
 import sys
+from dataclasses import dataclass
 from itertools import combinations
+from pathlib import Path
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.append(str(SCRIPT_DIR.parent))
 
-from examples.mock_kg import MOCK_INTENTS
+from examples.synthetic_kg import SYNTHETIC_INTENTS as KG_INTENTS
 
 
 RANDOM_SEED = 13
@@ -86,7 +87,7 @@ NOISE_SNIPPETS = [
     "I tried support chat but it timed out.",
 ]
 
-INTENT_INDEX = {i["intent_id"]: i for i in MOCK_INTENTS}
+INTENT_INDEX = {i["intent_id"]: i for i in KG_INTENTS}
 
 # Prioritize plausible intent pairs; allow small fraction of noise pairs for robustness.
 PLAUSIBLE_PAIR_IDS: List[Tuple[str, str]] = [
@@ -104,7 +105,7 @@ PLAUSIBLE_PAIR_IDS: List[Tuple[str, str]] = [
 ]
 
 # Noise pool: any remaining unique pairs not in plausible list.
-INTENT_IDS = [i["intent_id"] for i in MOCK_INTENTS]
+INTENT_IDS = [i["intent_id"] for i in KG_INTENTS]
 ALL_PAIRS = [(a, b) for a, b in combinations(INTENT_IDS, 2)]
 PLAUSIBLE_SET = {tuple(sorted(p)) for p in PLAUSIBLE_PAIR_IDS}
 NOISE_PAIR_IDS = [p for p in ALL_PAIRS if tuple(sorted(p)) not in PLAUSIBLE_SET]
@@ -224,7 +225,7 @@ def reasoning_terms(intent: dict, missing_slots: Iterable[str]) -> List[str]:
 
 
 def candidate_intents(intent_id: str) -> List[str]:
-    others = [i["intent_id"] for i in MOCK_INTENTS if i["intent_id"] != intent_id]
+    others = [i["intent_id"] for i in KG_INTENTS if i["intent_id"] != intent_id]
     return others[:4]
 
 
@@ -238,6 +239,59 @@ def dedup(seq: Iterable[str]) -> List[str]:
     return out
 
 
+class LLMGenerator:
+    """
+    Optional LLM-backed utterance generator. Requires openai-compatible SDK and API key.
+    """
+
+    def __init__(
+        self,
+        model: str,
+        base_url: Optional[str] = None,
+        api_key_env: str = "OPENAI_API_KEY",
+        temperature: float = 0.8,
+        max_tokens: int = 80,
+    ):
+        try:
+            from openai import OpenAI  # type: ignore
+        except ImportError as exc:
+            raise RuntimeError("openai package is required for LLM generation") from exc
+
+        api_key = os.getenv(api_key_env)
+        if not api_key:
+            raise RuntimeError(f"API key not found in env var {api_key_env}")
+
+        self.client = OpenAI(api_key=api_key, base_url=base_url)  # base_url None -> default
+        self.model = model
+        self.temperature = temperature
+        self.max_tokens = max_tokens
+
+    def generate(self, intent_desc: str, present_slots: Sequence[str], missing_slots: Sequence[str], difficulty: str) -> str:
+        sys_prompt = (
+            "You generate concise, single-turn user utterances for PPA intent routing. "
+            "Keep it natural, 1-2 sentences, no JSON. Include provided slot values. "
+            "If slots are missing, the utterance should naturally omit them. "
+            "Match the requested difficulty: simple (direct), medium (one slot missing), "
+            "complex (longer, multiple details), vague (underspecified)."
+        )
+        slot_text = "; ".join(build_slot_sentences(present_slots)) if present_slots else "no slot values"
+        miss_text = ", ".join(missing_slots) if missing_slots else "none"
+        user_prompt = (
+            f"Intent: {intent_desc}\n"
+            f"Difficulty: {difficulty}\n"
+            f"Given slot values to include: {slot_text}\n"
+            f"Missing/ambiguous slots: {miss_text}\n"
+            "Return only the user utterance."
+        )
+        resp = self.client.chat.completions.create(
+            model=self.model,
+            messages=[{"role": "system", "content": sys_prompt}, {"role": "user", "content": user_prompt}],
+            temperature=self.temperature,
+            max_tokens=self.max_tokens,
+        )
+        return resp.choices[0].message.content.strip()
+
+
 def choose_intent_pair(noise_ratio: float) -> tuple[dict, dict, str]:
     """
     Select a pair of intents for multi-intent examples, preferring plausible pairs.
@@ -249,12 +303,15 @@ def choose_intent_pair(noise_ratio: float) -> tuple[dict, dict, str]:
     return INTENT_INDEX[pair_ids[0]], INTENT_INDEX[pair_ids[1]], pair_type
 
 
-def build_single_example(intent: dict, bucket: Bucket, counter: int) -> dict:
+def build_single_example(intent: dict, bucket: Bucket, counter: int, llm: Optional[LLMGenerator]) -> dict:
     required = intent["required_slots"]
     missing_count = min(bucket.missing_slots, len(required))
     missing = random.sample(required, missing_count) if missing_count else []
     present = [s for s in required if s not in missing]
-    prompt = synthesize_prompt(intent["description"], present_slots=present, difficulty=bucket.difficulty)
+    if llm:
+        prompt = llm.generate(intent["description"], present_slots=present, missing_slots=missing, difficulty=bucket.difficulty)
+    else:
+        prompt = synthesize_prompt(intent["description"], present_slots=present, difficulty=bucket.difficulty)
     if bucket.noise:
         noise = random.sample(NOISE_SNIPPETS, k=min(bucket.noise, len(NOISE_SNIPPETS)))
         prompt = f"{prompt} {' '.join(noise)}"
@@ -276,13 +333,16 @@ def build_single_example(intent: dict, bucket: Bucket, counter: int) -> dict:
     }
 
 
-def build_multi_example(intent_a: dict, intent_b: dict, bucket: Bucket, counter: int, pair_type: str) -> dict:
+def build_multi_example(intent_a: dict, intent_b: dict, bucket: Bucket, counter: int, pair_type: str, llm: Optional[LLMGenerator]) -> dict:
     combined_desc = f"{intent_a['description']} and {intent_b['description']}"
     required = intent_a["required_slots"] + intent_b["required_slots"]
     missing_count = min(bucket.missing_slots, len(required))
     missing = random.sample(required, missing_count) if missing_count else []
     present = [s for s in required if s not in missing][:5]
-    prompt_core = synthesize_prompt(combined_desc, present_slots=present, difficulty=bucket.difficulty)
+    if llm:
+        prompt_core = llm.generate(combined_desc, present_slots=present, missing_slots=missing, difficulty=bucket.difficulty)
+    else:
+        prompt_core = synthesize_prompt(combined_desc, present_slots=present, difficulty=bucket.difficulty)
     prompt = f"I need help with two things: {prompt_core}"
     if bucket.noise:
         noise = random.sample(NOISE_SNIPPETS, k=min(bucket.noise, len(NOISE_SNIPPETS)))
@@ -334,7 +394,7 @@ def scaled_targets(total: int) -> List[Bucket]:
     return scaled
 
 
-def build_dataset(target_count: int) -> List[dict]:
+def build_dataset(target_count: int, llm: Optional[LLMGenerator]) -> List[dict]:
     buckets = scaled_targets(target_count)
     dataset: List[dict] = []
     counter = 0
@@ -343,11 +403,11 @@ def build_dataset(target_count: int) -> List[dict]:
         for _ in range(bucket.target):
             counter += 1
             if bucket.decision_category == "single_intent":
-                intent = random.choice(MOCK_INTENTS)
-                dataset.append(build_single_example(intent, bucket, counter))
+                intent = random.choice(KG_INTENTS)
+                dataset.append(build_single_example(intent, bucket, counter, llm))
             else:
                 intent_a, intent_b, pair_type = choose_intent_pair(noise_ratio)
-                dataset.append(build_multi_example(intent_a, intent_b, bucket, counter, pair_type))
+                dataset.append(build_multi_example(intent_a, intent_b, bucket, counter, pair_type, llm))
     random.shuffle(dataset)
     return dataset[:target_count]
 
@@ -377,10 +437,30 @@ def main():
     parser = argparse.ArgumentParser(description="Generate mock RL dataset for DecisionObject reward.")
     parser.add_argument("--output", type=Path, default=Path("examples/mock_rl_dataset.jsonl"), help="JSONL output path.")
     parser.add_argument("--count", type=int, default=500, help="Number of examples to emit (default 500).")
+    parser.add_argument("--use-llm", action="store_true", help="Use an LLM to generate utterances instead of templates.")
+    parser.add_argument("--llm-model", type=str, default="gpt-4o-mini", help="LLM model name (OpenAI-compatible).")
+    parser.add_argument("--llm-base-url", type=str, default=None, help="Optional custom base URL for OpenAI-compatible endpoints.")
+    parser.add_argument("--llm-api-key-env", type=str, default="OPENAI_API_KEY", help="Env var holding the API key.")
+    parser.add_argument("--llm-temperature", type=float, default=0.8, help="LLM temperature.")
+    parser.add_argument("--llm-max-tokens", type=int, default=80, help="Max tokens for LLM completion.")
     args = parser.parse_args()
 
     random.seed(RANDOM_SEED)
-    dataset = build_dataset(args.count)
+    llm = None
+    if args.use_llm:
+        try:
+            llm = LLMGenerator(
+                model=args.llm_model,
+                base_url=args.llm_base_url,
+                api_key_env=args.llm_api_key_env,
+                temperature=args.llm_temperature,
+                max_tokens=args.llm_max_tokens,
+            )
+            print(f"LLM generation enabled: model={args.llm_model} base_url={args.llm_base_url or 'default'}")
+        except Exception as exc:
+            raise SystemExit(f"Failed to initialize LLM generator: {exc}") from exc
+
+    dataset = build_dataset(args.count, llm)
     save_jsonl(dataset, args.output)
 
     print(f"Wrote {len(dataset)} examples to {args.output}")
