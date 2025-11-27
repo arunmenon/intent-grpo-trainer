@@ -18,17 +18,24 @@ Quick start (TRL)
    python examples/run_trl_dummy.py
    ```
 3) DecisionObject path (PPA-style):
-   - Generate or use the provided dataset: `python3 examples/generate_mock_rl_dataset.py --output examples/mock_rl_dataset.jsonl --count 500`
-   - Validate against the KG: `python3 examples/validate_dataset.py --data examples/mock_rl_dataset.jsonl --kg examples/synthetic_kg.json`
-   - Optional: synthesize utterances with an LLM via liteLLM by adding `--use-llm --llm-model <model>` (OpenAI-compatible; set API key in `LITELLM_API_KEY` or `OPENAI_API_KEY`, custom base via `--llm-base-url`).
-   - Optional: progress logging with `--log-every <N>`, parallel LLM generation with `--llm-workers <num_threads>`, reproducibility via `--seed`, and prompt deduplication via `--dedup-prompts`.
-   - Load and train:
-     ```python
-     from examples.trl_integration import build_trl_grpo_trainer, load_decision_dataset
-     ds = load_decision_dataset("examples/mock_rl_dataset.jsonl")
-     trainer = build_trl_grpo_trainer("gpt2", ds, reward_variant="decision_object")
-     trainer.train(max_steps=1)
+   - Generate a dataset (template or LLM):  
+     ```bash
+     # Template-based (fast)
+     python3 examples/generate_mock_rl_dataset.py --output examples/mock_rl_dataset.jsonl --count 500 --seed 42 --dedup-prompts --log-every 100
+     # LLM-based (set API key first: export LITELLM_API_KEY=...; adjust model/temperature/workers)
+     python3 examples/generate_mock_rl_dataset.py --use-llm --llm-model gpt-4o-mini --llm-workers 4 --llm-temperature 0.8 \
+       --output examples/mock_rl_dataset.jsonl --count 500 --seed 42 --dedup-prompts --log-every 50
      ```
+   - Validate against the KG:  
+     ```bash
+     python3 examples/validate_dataset.py --data examples/mock_rl_dataset.jsonl --kg examples/synthetic_kg.json
+     ```
+   - Train with DecisionObject rewards (TRL):  
+     ```bash
+     python3 scripts/run_decision_grpo.py --model-id gpt2 --dataset examples/mock_rl_dataset.jsonl \
+       --steps 50 --batch-size 1 --grad-accum 1 --reward-variant decision_object
+     ```
+     (Set `CUDA_VISIBLE_DEVICES` as needed; script warns if CUDA is missing. Install torch appropriate to your GPU.)
 4) Tune `GRPOConfig` (num_generations, max_completion_length, batch size, bf16/fp16) for your hardware in `examples/trl_integration.py`.
 
 Custom loop option
