@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import concurrent.futures
 import os
 import random
 import sys
@@ -400,20 +401,50 @@ def scaled_targets(total: int) -> List[Bucket]:
     return scaled
 
 
-def build_dataset(target_count: int, llm: Optional[LLMGenerator]) -> List[dict]:
+def build_dataset(target_count: int, llm: Optional[LLMGenerator], log_every: int = 0, llm_workers: int = 1) -> List[dict]:
     buckets = scaled_targets(target_count)
-    dataset: List[dict] = []
+    tasks: List[tuple] = []
     counter = 0
     noise_ratio = 0.15  # fraction of multi-intent pairs drawn from noise pool
+
+    # Prepare tasks deterministically (intent selection + bucket) before parallel prompt generation.
     for bucket in buckets:
         for _ in range(bucket.target):
             counter += 1
             if bucket.decision_category == "single_intent":
                 intent = random.choice(KG_INTENTS)
-                dataset.append(build_single_example(intent, bucket, counter, llm))
+                tasks.append(("single", intent, bucket, counter))
             else:
                 intent_a, intent_b, pair_type = choose_intent_pair(noise_ratio)
-                dataset.append(build_multi_example(intent_a, intent_b, bucket, counter, pair_type, llm))
+                tasks.append(("multi", intent_a, intent_b, bucket, counter, pair_type))
+
+    dataset: List[dict] = []
+    # Parallelize only when using LLM (network-bound).
+    if llm and llm_workers and llm_workers > 1:
+        futures = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=llm_workers) as executor:
+            for t in tasks:
+                if t[0] == "single":
+                    futures.append(
+                        executor.submit(build_single_example, t[1], t[2], t[3], llm)
+                    )
+                else:
+                    futures.append(
+                        executor.submit(build_multi_example, t[1], t[2], t[3], t[4], t[5], llm)
+                    )
+            for idx, fut in enumerate(concurrent.futures.as_completed(futures), 1):
+                dataset.append(fut.result())
+                if log_every and idx % log_every == 0:
+                    print(f"[gen] built {idx}/{target_count} examples...", flush=True)
+    else:
+        for idx, t in enumerate(tasks, 1):
+            if t[0] == "single":
+                dataset.append(build_single_example(t[1], t[2], t[3], llm))
+            else:
+                dataset.append(build_multi_example(t[1], t[2], t[3], t[4], t[5], llm))
+            if log_every and idx % log_every == 0:
+                print(f"[gen] built {idx}/{target_count} examples...", flush=True)
+
     random.shuffle(dataset)
     return dataset[:target_count]
 
@@ -449,6 +480,8 @@ def main():
     parser.add_argument("--llm-api-key-env", type=str, default="LITELLM_API_KEY", help="Env var holding the primary API key (falls back to OPENAI_API_KEY).")
     parser.add_argument("--llm-temperature", type=float, default=0.8, help="LLM temperature.")
     parser.add_argument("--llm-max-tokens", type=int, default=80, help="Max tokens for LLM completion.")
+    parser.add_argument("--log-every", type=int, default=0, help="Print progress every N examples (0 to disable).")
+    parser.add_argument("--llm-workers", type=int, default=1, help="Number of threads for LLM-backed generation (1 = sequential).")
     args = parser.parse_args()
 
     random.seed(RANDOM_SEED)
@@ -466,7 +499,7 @@ def main():
         except Exception as exc:
             raise SystemExit(f"Failed to initialize LLM generator: {exc}") from exc
 
-    dataset = build_dataset(args.count, llm)
+    dataset = build_dataset(args.count, llm, log_every=args.log_every, llm_workers=args.llm_workers)
     save_jsonl(dataset, args.output)
 
     print(f"Wrote {len(dataset)} examples to {args.output}")
