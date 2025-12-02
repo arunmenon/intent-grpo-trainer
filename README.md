@@ -7,6 +7,7 @@ GRPO/TRL scaffold for structured intent disambiguation with JSON schema rewards.
 What’s here
 - Reward rubric (R1–R5) for JSON validity/KG paths, decision type, intent match, question coverage, and reasoning keywords. See `grpo_intent/reward_components.py` (legacy) and `grpo_intent/intent_reward.py` (DecisionObject).
 - Multi-turn scaffolding for plan-aware rewards: `grpo_intent/plan_schema.py` defines minimal plan/branch/tool types; `grpo_intent/plan_reward.py` implements per-step micro-rewards (slot F1, preconditions/effects, branch/tool validity, latency, policy) and discounted trajectory aggregation.
+- Router scaffolding: `grpo_intent/router_schema.py` (RouterInput/Action/Tool types) and `grpo_intent/router_reward.py` (router reward shaping + simulator); TRL wiring in `examples/router_trl_integration.py`.
 - TRL integration: `examples/trl_integration.py` (single-turn legacy/DecisionObject) and `examples/plan_trl_integration.py` (plan-aware).
 - Schema parsing helpers: `grpo_intent/schema.py` (legacy) and `grpo_intent/decision_schema.py` (DecisionObject) to safely score partially valid outputs.
 - Optional replay cache and rollout scheduler (`grpo_intent/replay_cache.py`, `grpo_intent/schedule.py`) plus trainer scaffold (`grpo_intent/trainer_scaffold.py`).
@@ -56,6 +57,11 @@ Multi-turn plan rewards (demo)
   ```bash
   # Demo dataset; replace with --dataset for your JSONL of gold plan steps
   python scripts/run_plan_trl.py --model-id gpt2 --steps 5 --demo
+  ```
+- Router GRPO training (TRL, scaffold):
+  ```bash
+  # Demo dataset; replace with --dataset for your JSONL of router inputs/tool menus
+  python scripts/run_router_trl.py --model-id gpt2 --steps 5 --demo
   ```
 
 Custom loop option
