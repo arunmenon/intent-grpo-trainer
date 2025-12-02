@@ -23,23 +23,36 @@ from grpo_intent.router_reward import RouterRewardSettings, RouterSimulator
 from grpo_intent.router_schema import RouterAction, RouterActionType, RouterObservation, RouterTool
 
 
-ParserFn = Callable[[str], RouterAction]
+ParserFn = Callable[[str], List[RouterAction]]
 
 
-def default_parse_action(raw_text: str) -> RouterAction:
+def default_parse_actions(raw_text: str) -> List[RouterAction]:
+    """
+    Accept either a single RouterAction JSON object or {"actions": [...]} wrapping multiple.
+    """
     payload = json.loads(raw_text)
-    return RouterAction(
-        decision_id=payload.get("decision_id", ""),
-        step_index=payload.get("step_index", 0),
-        action_type=RouterActionType(payload.get("action_type", "ANSWER")),
-        tool_id=payload.get("tool_id"),
-        plan_id=payload.get("plan_id"),
-        args=payload.get("args", {}),
-        answer=payload.get("answer"),
-        finish_reason=payload.get("finish_reason", "continue"),
-        router_confidence=payload.get("router_confidence"),
-        metadata=payload.get("metadata", {}),
-    )
+    if isinstance(payload, dict) and "actions" in payload and isinstance(payload["actions"], list):
+        items = payload["actions"]
+    else:
+        items = [payload]
+
+    actions: List[RouterAction] = []
+    for item in items:
+        actions.append(
+            RouterAction(
+                decision_id=item.get("decision_id", ""),
+                step_index=item.get("step_index", len(actions)),
+                action_type=RouterActionType(item.get("action_type", "ANSWER")),
+                tool_id=item.get("tool_id"),
+                plan_id=item.get("plan_id"),
+                args=item.get("args", {}),
+                answer=item.get("answer"),
+                finish_reason=item.get("finish_reason", "continue"),
+                router_confidence=item.get("router_confidence"),
+                metadata=item.get("metadata", {}),
+            )
+        )
+    return actions
 
 
 def build_router_observation(example: dict) -> RouterObservation:
@@ -62,7 +75,7 @@ def build_router_observation(example: dict) -> RouterObservation:
 def build_router_grpo_trainer(
     model_name: str,
     train_dataset,
-    parse_action_fn: ParserFn = default_parse_action,
+    parse_action_fn: ParserFn = default_parse_actions,
     reward_settings: RouterRewardSettings = RouterRewardSettings(),
     initial_k: int = 4,
     max_completion_length: int = 128,
@@ -95,8 +108,8 @@ def build_router_grpo_trainer(
             obs = build_router_observation(example)
             for completion in completions:
                 try:
-                    action = parse_action_fn(completion)
-                    metrics = simulator.run_episode(obs, [action])
+                    actions = parse_action_fn(completion)
+                    metrics = simulator.run_episode(obs, actions)
                     rewards.append(metrics.reward)
                 except Exception:
                     rewards.append(0.0)

@@ -12,7 +12,7 @@ Weights are configurable via RouterRewardSettings.
 """
 
 from dataclasses import dataclass
-from typing import List
+from typing import Iterable, List, Optional
 
 from .router_schema import RouterAction, RouterActionType, RouterObservation, TraceStep
 
@@ -57,6 +57,9 @@ def compute_reward(metrics: RouterEpisodeMetrics, settings: RouterRewardSettings
 class RouterSimulator:
     """
     Minimal loop to execute router actions against a tool menu stub for demos/tests.
+
+    - If trace_steps is provided, their latency/cost/violations are used.
+    - Otherwise, falls back to tool_menu latency/cost heuristics.
     """
 
     def __init__(self, settings: RouterRewardSettings | None = None):
@@ -72,27 +75,48 @@ class RouterSimulator:
             or tool.estimated_cost_usd_per_call >= self.settings.big_model_cost_usd
         )
 
-    def run_episode(self, obs: RouterObservation, actions: List[RouterAction]) -> RouterEpisodeMetrics:
+    def _aggregate_from_trace(self, trace_steps: Iterable[TraceStep], obs: RouterObservation) -> tuple[float, float, int, int]:
         total_latency = 0.0
         total_cost = 0.0
         violations = 0
         big_calls = 0
+        for ts in trace_steps:
+            total_latency += ts.latency_ms
+            total_cost += ts.cost_usd
+            violations += len(ts.violations)
+            if ts.action.action_type == RouterActionType.CALL_TOOL and self.is_big_model(ts.action, obs):
+                big_calls += 1
+        return total_latency, total_cost, violations, big_calls
 
+    def _aggregate_from_actions(self, actions: Iterable[RouterAction], obs: RouterObservation) -> tuple[float, float, int, int]:
+        total_latency = 0.0
+        total_cost = 0.0
+        violations = 0
+        big_calls = 0
         for act in actions:
             if act.action_type == RouterActionType.ANSWER:
-                # treat answer as finalization step; zero tool cost.
-                pass
+                continue
+            tool = next((t for t in obs.tool_menu if t.tool_id == act.tool_id), None)
+            if tool:
+                total_latency += tool.estimated_latency_ms_p50
+                total_cost += tool.estimated_cost_usd_per_call
             else:
-                tool = next((t for t in obs.tool_menu if t.tool_id == act.tool_id), None)
-                if tool:
-                    total_latency += tool.estimated_latency_ms_p50
-                    total_cost += tool.estimated_cost_usd_per_call
-                else:
-                    violations += 1
-                if self.is_big_model(act, obs):
-                    big_calls += 1
+                violations += 1
+            if self.is_big_model(act, obs):
+                big_calls += 1
+        return total_latency, total_cost, violations, big_calls
 
-        # Simplified success heuristic: if final action is ANSWER, count as success.
+    def run_episode(
+        self,
+        obs: RouterObservation,
+        actions: List[RouterAction],
+        trace_steps: Optional[List[TraceStep]] = None,
+    ) -> RouterEpisodeMetrics:
+        if trace_steps:
+            total_latency, total_cost, violations, big_calls = self._aggregate_from_trace(trace_steps, obs)
+        else:
+            total_latency, total_cost, violations, big_calls = self._aggregate_from_actions(actions, obs)
+
         success = 1 if actions and actions[-1].action_type == RouterActionType.ANSWER else 0
         metrics = RouterEpisodeMetrics(
             success=success,
@@ -105,4 +129,3 @@ class RouterSimulator:
         )
         metrics.reward = compute_reward(metrics, self.settings)
         return metrics
-
