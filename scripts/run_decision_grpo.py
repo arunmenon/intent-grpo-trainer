@@ -1,7 +1,7 @@
 """
-Convenience wrapper to run DecisionObject GRPO training on GPU.
+Run single-turn intent-routing GRPO (legacy or DecisionObject rewards).
 
-Usage:
+Usage (DecisionObject sample dataset):
   python scripts/run_decision_grpo.py \
     --model-id gpt2 \
     --dataset examples/mock_rl_dataset.jsonl \
@@ -19,7 +19,7 @@ Flags:
   --weight-decay: weight decay (default 0.01).
   --reward-variant: legacy or decision_object (default decision_object).
 
-This script assumes CUDA is available; device_map="auto" will place the model on GPU.
+device_map="auto" will place the model on GPU if CUDA is available.
 """
 
 from __future__ import annotations
