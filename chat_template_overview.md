@@ -180,3 +180,19 @@ Tool replies follow with `role = "tool"` and matching `tool_call_id`.
 - `tool_plan.steps.phase` aligns with `reasoning.stage`.
 - `tool_calls` have matching `tool` messages (via `tool_call_id`).
 - `intent_ids` and `slots_used` are valid against the KG/patterns.
+
+---
+
+## 8. Narrative explainer (play script analogy)
+- **System** = the director: sets behavior/persona in the system prompt.
+- **User** = customer: natural-language problem description.
+- **Assistant** = the agent: user-facing text (`content`) + internal state (`reasoning`) + plan (`tool_plan`) + actual tool calls (`tool_calls`).
+- **Tool** = backend replies: tool responses keyed by `tool_call_id`.
+
+Flow (per conversation):
+1) Clarify slots: assistant asks for missing info; plan lists collect + upcoming diag/resolve steps.
+2) Diagnosis: per intent, assistant calls `diagnose_intent`; tool returns diagnosis.
+3) Resolution: per intent, assistant calls `resolve_intent`; tool returns resolution.
+4) Final summary: assistant calls `show_to_user` with a single user-facing recap.
+
+Each SFT sample is simply: **history** (all prior messages) → **target** (current assistant message with reasoning/tool_plan/tool_calls).
