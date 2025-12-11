@@ -1,0 +1,430 @@
+[
+  {
+    "pattern_id": "PPA.MultiIntent.ItemNotReceivedPlusPartialRefund",
+    "component_intents": [
+      "PPA.Disputes.ItemIssues.ItemNotReceived",
+      "PPA.Refunds.BuyerRefunds.PartialRefund"
+    ],
+    "description": "Buyer says an item has not arrived and also asks for a partial refund (e.g., shipping or partial compensation).",
+    "example_user_utterances": [
+      "My package never arrived and I only want part of the payment refunded because the seller sent a replacement.",
+      "The item didn’t show up on time, can we do a partial refund for the shipping and I’ll wait a bit longer?"
+    ],
+    "order_hint": [
+      "PPA.Disputes.ItemIssues.ItemNotReceived",
+      "PPA.Refunds.BuyerRefunds.PartialRefund"
+    ],
+    "shared_slots": [
+      "txn_id",
+      "seller",
+      "expected_delivery_date",
+      "amount"
+    ]
+  },
+  {
+    "pattern_id": "PPA.MultiIntent.NotAsDescribedPlusFullRefund",
+    "component_intents": [
+      "PPA.Disputes.ItemIssues.NotAsDescribed",
+      "PPA.Refunds.BuyerRefunds.FullRefund"
+    ],
+    "description": "Buyer explains that the item is not as described and explicitly asks for a full refund.",
+    "example_user_utterances": [
+      "The shoes I received look nothing like the listing and I want a full refund.",
+      "This item is completely different from what was advertised, please refund the full amount."
+    ],
+    "order_hint": [
+      "PPA.Disputes.ItemIssues.NotAsDescribed",
+      "PPA.Refunds.BuyerRefunds.FullRefund"
+    ],
+    "shared_slots": [
+      "txn_id",
+      "issue_detail",
+      "photos"
+    ]
+  },
+  {
+    "pattern_id": "PPA.MultiIntent.SubscriptionChargePlusCancelRecurring",
+    "component_intents": [
+      "PPA.Disputes.RecurringCharge",
+      "PPA.Payments.Subscriptions.CancelRecurring"
+    ],
+    "description": "User was charged unexpectedly for a subscription and also wants to cancel future recurring payments.",
+    "example_user_utterances": [
+      "I was just charged again for Netflix without my permission and I want to cancel the subscription going forward.",
+      "There’s an unexpected recurring charge from this app and I need to stop all future payments."
+    ],
+    "order_hint": [
+      "PPA.Disputes.RecurringCharge",
+      "PPA.Payments.Subscriptions.CancelRecurring"
+    ],
+    "shared_slots": [
+      "txn_id",
+      "merchant",
+      "date",
+      "next_bill_date"
+    ]
+  },
+  {
+    "pattern_id": "PPA.MultiIntent.UnauthorizedPlusLockedOut",
+    "component_intents": [
+      "PPA.Disputes.Unauthorized",
+      "PPA.Account.Access.LockedOut"
+    ],
+    "description": "User sees an unauthorized payment and is now locked out of the account.",
+    "example_user_utterances": [
+      "I see an unauthorized charge and now I can’t even log in to my account.",
+      "Someone hacked my account, made a payment, and now I’m locked out."
+    ],
+    "order_hint": [
+      "PPA.Disputes.Unauthorized",
+      "PPA.Account.Access.LockedOut"
+    ],
+    "shared_slots": [
+      "txn_id",
+      "device",
+      "date",
+      "login_email"
+    ]
+  },
+  {
+    "pattern_id": "PPA.MultiIntent.BankLinkVerificationPlusWithdrawalDelayed",
+    "component_intents": [
+      "PPA.Payments.BankLink.Verification",
+      "PPA.Payments.Withdrawals.Delayed"
+    ],
+    "description": "User has trouble verifying a bank and also has a delayed withdrawal to that bank.",
+    "example_user_utterances": [
+      "My bank won’t verify properly and the withdrawal to that same bank is still pending.",
+      "I can’t finish linking my bank and the transfer I started to it is stuck."
+    ],
+    "order_hint": [
+      "PPA.Payments.BankLink.Verification",
+      "PPA.Payments.Withdrawals.Delayed"
+    ],
+    "shared_slots": [
+      "bank_name",
+      "txn_id",
+      "date"
+    ]
+  },
+  {
+    "pattern_id": "PPA.MultiIntent.AddCardFailedPlusTransferToBankFailed",
+    "component_intents": [
+      "PPA.Payments.AddCard.Failed",
+      "PPA.Payments.TransferToBank.Failed"
+    ],
+    "description": "User’s new card can’t be added and a transfer to their bank is also failing.",
+    "example_user_utterances": [
+      "PayPal won’t let me add my Wells Fargo card and my transfer to that bank is also failing.",
+      "My new card can’t be added and I keep getting an error when I try to move money to my bank."
+    ],
+    "order_hint": [
+      "PPA.Payments.AddCard.Failed",
+      "PPA.Payments.TransferToBank.Failed"
+    ],
+    "shared_slots": [
+      "bank_name",
+      "issuer",
+      "card_last4",
+      "error_message",
+      "date"
+    ]
+  },
+  {
+    "pattern_id": "PPA.MultiIntent.PayLaterLimitIncreasePlusPaymentDeclined",
+    "component_intents": [
+      "PPA.Payments.PayLater.LimitIncrease",
+      "PPA.Payments.PayLater.PaymentDeclined"
+    ],
+    "description": "User requests a higher Pay Later limit because a Pay Later purchase was declined.",
+    "example_user_utterances": [
+      "My Pay Later was just declined for a larger purchase, can you increase my limit so it goes through?",
+      "I tried to pay using Pay Later and it got declined; I think I need a higher limit."
+    ],
+    "order_hint": [
+      "PPA.Payments.PayLater.PaymentDeclined",
+      "PPA.Payments.PayLater.LimitIncrease"
+    ],
+    "shared_slots": [
+      "amount",
+      "merchant",
+      "device",
+      "date",
+      "error_message"
+    ]
+  },
+  {
+    "pattern_id": "PPA.MultiIntent.RefundStatusPlusChargebackResponse",
+    "component_intents": [
+      "PPA.Refunds.BuyerRefunds.RefundStatus",
+      "PPA.Resolution.Chargeback.Response"
+    ],
+    "description": "User is confused between a PayPal refund and a bank chargeback for the same transaction.",
+      "example_user_utterances": [
+      "I requested a refund and now my bank also opened a chargeback case – what should I do?",
+      "There’s a chargeback case and a refund at the same time for the same payment, I need help responding."
+    ],
+    "order_hint": [
+      "PPA.Resolution.Chargeback.Response",
+      "PPA.Refunds.BuyerRefunds.RefundStatus"
+    ],
+    "shared_slots": [
+      "txn_id"
+    ]
+  },
+  {
+    "pattern_id": "PPA.MultiIntent.DamagedItemPlusPartialRefund",
+    "component_intents": [
+      "PPA.Disputes.ItemIssues.DamagedItem",
+      "PPA.Refunds.BuyerRefunds.PartialRefund"
+    ],
+    "description": "User received a damaged item and is requesting a partial refund/store credit.",
+    "example_user_utterances": [
+      "The item arrived broken; can we just do a partial refund or store credit?",
+      "It’s damaged but I’ll accept a partial refund if that’s faster."
+    ],
+    "order_hint": [
+      "PPA.Disputes.ItemIssues.DamagedItem",
+      "PPA.Refunds.BuyerRefunds.PartialRefund"
+    ],
+    "shared_slots": [
+      "txn_id",
+      "issue_detail"
+    ]
+  },
+  {
+    "pattern_id": "PPA.MultiIntent.WrongItemReceivedPlusFullRefund",
+    "component_intents": [
+      "PPA.Disputes.ItemIssues.WrongItemReceived",
+      "PPA.Refunds.BuyerRefunds.FullRefund"
+    ],
+    "description": "User received the wrong item and wants a full refund.",
+    "example_user_utterances": [
+      "I got the wrong item entirely and I want a full refund.",
+      "They shipped the wrong product—please refund the full amount."
+    ],
+    "order_hint": [
+      "PPA.Disputes.ItemIssues.WrongItemReceived",
+      "PPA.Refunds.BuyerRefunds.FullRefund"
+    ],
+    "shared_slots": [
+      "txn_id",
+      "issue_detail"
+    ]
+  },
+  {
+    "pattern_id": "PPA.MultiIntent.RecurringChargePlusRefundStatus",
+    "component_intents": [
+      "PPA.Disputes.RecurringCharge",
+      "PPA.Refunds.BuyerRefunds.RefundStatus"
+    ],
+    "description": "User sees an unexpected recurring charge and also wants to check refund status on it.",
+    "example_user_utterances": [
+      "There’s a recurring charge I didn’t expect—was a refund started for it?",
+      "I just got charged again and I’m waiting on a refund, what’s the status?"
+    ],
+    "order_hint": [
+      "PPA.Disputes.RecurringCharge",
+      "PPA.Refunds.BuyerRefunds.RefundStatus"
+    ],
+    "shared_slots": [
+      "txn_id",
+      "merchant",
+      "date"
+    ]
+  },
+  {
+    "pattern_id": "PPA.MultiIntent.AddCardFailedPlusCheckoutCardDeclined",
+    "component_intents": [
+      "PPA.Payments.AddCard.Failed",
+      "PPA.Payments.Checkout.CardDeclined"
+    ],
+    "description": "New card cannot be added and checkout payments with that card are declined.",
+    "example_user_utterances": [
+      "I can’t add my new card and even when I try to pay it gets declined.",
+      "Card won’t save to my wallet and checkout keeps failing with a decline."
+    ],
+    "order_hint": [
+      "PPA.Payments.AddCard.Failed",
+      "PPA.Payments.Checkout.CardDeclined"
+    ],
+    "shared_slots": [
+      "card_last4",
+      "issuer",
+      "error_message"
+    ]
+  },
+  {
+    "pattern_id": "PPA.MultiIntent.BankLinkVerificationPlusSendMoneyIssue",
+    "component_intents": [
+      "PPA.Payments.BankLink.Verification",
+      "PPA.Payments.SendMoney.Issue"
+    ],
+    "description": "Bank can’t be verified and send-money using that bank fails.",
+    "example_user_utterances": [
+      "My bank won’t verify and sending money from it fails.",
+      "I’m stuck verifying my bank and transfers from it aren’t going through."
+    ],
+    "order_hint": [
+      "PPA.Payments.BankLink.Verification",
+      "PPA.Payments.SendMoney.Issue"
+    ],
+    "shared_slots": [
+      "bank_name",
+      "error_message",
+      "date"
+    ]
+  },
+  {
+    "pattern_id": "PPA.MultiIntent.TransferFailedPlusWithdrawalDelayed",
+    "component_intents": [
+      "PPA.Payments.TransferToBank.Failed",
+      "PPA.Payments.Withdrawals.Delayed"
+    ],
+    "description": "One transfer to bank failed and another withdrawal is stuck pending.",
+    "example_user_utterances": [
+      "One transfer to my bank failed and the other is still pending.",
+      "My transfer error’d out and a different withdrawal is delayed."
+    ],
+    "order_hint": [
+      "PPA.Payments.TransferToBank.Failed",
+      "PPA.Payments.Withdrawals.Delayed"
+    ],
+    "shared_slots": [
+      "bank_name",
+      "txn_id",
+      "date"
+    ]
+  },
+  {
+    "pattern_id": "PPA.MultiIntent.WithdrawalsReversedPlusAccountLimited",
+    "component_intents": [
+      "PPA.Payments.Withdrawals.Reversed",
+      "PPA.Account.Access.Limited"
+    ],
+    "description": "Withdrawal was reversed and the account is also limited.",
+    "example_user_utterances": [
+      "My withdrawal got reversed and now my account is limited.",
+      "The bank transfer was returned and my account shows a limitation."
+    ],
+    "order_hint": [
+      "PPA.Account.Access.Limited",
+      "PPA.Payments.Withdrawals.Reversed"
+    ],
+    "shared_slots": [
+      "txn_id",
+      "bank_name",
+      "date"
+    ]
+  },
+  {
+    "pattern_id": "PPA.MultiIntent.WithdrawalsDelayedPlusAccountLimited",
+    "component_intents": [
+      "PPA.Payments.Withdrawals.Delayed",
+      "PPA.Account.Access.Limited"
+    ],
+    "description": "A withdrawal is delayed and the account is limited under review.",
+    "example_user_utterances": [
+      "My withdrawal is stuck pending and my account is limited.",
+      "Transfer is delayed and I see an account limitation notice."
+    ],
+    "order_hint": [
+      "PPA.Account.Access.Limited",
+      "PPA.Payments.Withdrawals.Delayed"
+    ],
+    "shared_slots": [
+      "txn_id",
+      "bank_name",
+      "date"
+    ]
+  },
+  {
+    "pattern_id": "PPA.MultiIntent.UnauthorizedPlusSuspectedCompromise",
+    "component_intents": [
+      "PPA.Disputes.Unauthorized",
+      "PPA.Account.Security.SuspectedCompromise"
+    ],
+    "description": "Unauthorized payment plus signs of account compromise.",
+    "example_user_utterances": [
+      "There’s an unauthorized charge and I think my account was compromised.",
+      "I didn’t make this payment and I’m seeing suspicious activity."
+    ],
+    "order_hint": [
+      "PPA.Account.Security.SuspectedCompromise",
+      "PPA.Disputes.Unauthorized"
+    ],
+    "shared_slots": [
+      "login_email",
+      "device",
+      "date"
+    ]
+  },
+  {
+    "pattern_id": "PPA.MultiIntent.UnauthorizedPlusSuspectedCompromisePlusLockedOut",
+    "component_intents": [
+      "PPA.Disputes.Unauthorized",
+      "PPA.Account.Security.SuspectedCompromise",
+      "PPA.Account.Access.LockedOut"
+    ],
+    "description": "Unauthorized activity, suspected compromise, and user is locked out.",
+    "example_user_utterances": [
+      "Someone made a payment, my account looks hacked, and I’m locked out.",
+      "I see an unauthorized charge, suspicious login, and now I can’t log in."
+    ],
+    "order_hint": [
+      "PPA.Account.Security.SuspectedCompromise",
+      "PPA.Disputes.Unauthorized",
+      "PPA.Account.Access.LockedOut"
+    ],
+    "shared_slots": [
+      "login_email",
+      "device",
+      "date",
+      "txn_id"
+    ]
+  },
+  {
+    "pattern_id": "PPA.MultiIntent.UpdateAddressPlusCheckoutCardDeclined",
+    "component_intents": [
+      "PPA.Account.Profile.UpdateAddress",
+      "PPA.Payments.Checkout.CardDeclined"
+    ],
+    "description": "Address recently updated; checkout card decline likely due to AVS mismatch.",
+    "example_user_utterances": [
+      "I updated my address and now my card is declined at checkout.",
+      "Changed my billing address, the card keeps failing with a mismatch."
+    ],
+    "order_hint": [
+      "PPA.Account.Profile.UpdateAddress",
+      "PPA.Payments.Checkout.CardDeclined"
+    ],
+    "shared_slots": [
+      "card_last4",
+      "issuer",
+      "address_type",
+      "country"
+    ]
+  },
+  {
+    "pattern_id": "PPA.MultiIntent.SubscriptionChargePlusChangePlan",
+    "component_intents": [
+      "PPA.Disputes.RecurringCharge",
+      "PPA.Payments.Subscriptions.ChangePlan"
+    ],
+    "description": "Unexpected subscription charge and user wants to change the plan/tier.",
+    "example_user_utterances": [
+      "I was charged the wrong subscription amount and need to change the plan.",
+      "Got an unexpected recurring charge and want to switch to a cheaper plan."
+    ],
+    "order_hint": [
+      "PPA.Disputes.RecurringCharge",
+      "PPA.Payments.Subscriptions.ChangePlan"
+    ],
+    "shared_slots": [
+      "merchant",
+      "current_plan",
+      "desired_change",
+      "next_bill_date"
+    ]
+  }
+]

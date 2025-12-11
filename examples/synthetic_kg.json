@@ -32,13 +32,15 @@
     "path": ["PPA", "Payments", "SendMoney", "Issue"],
     "description": "problem while sending money to a contact",
     "required_slots": ["amount", "currency", "receiver"],
-    "optional_slots": ["device", "date"],
+    "optional_slots": ["device", "date", "bank_name", "error_message"],
     "clarification_templates": {
       "amount": "What amount were you trying to send?",
       "currency": "Which currency was the transfer in?",
       "receiver": "Who were you sending the money to?",
       "device": "Were you on mobile or web?",
-      "date": "When did you try the transfer?"
+      "date": "When did you try the transfer?",
+      "bank_name": "Which bank account were you trying to send money from?",
+      "error_message": "What error message did you see when the send failed?"
     }
   },
   {
@@ -46,13 +48,14 @@
     "path": ["PPA", "Disputes", "TransactionDisputes", "Unauthorized"],
     "description": "unauthorized charge or login",
     "required_slots": ["txn_id", "device", "date"],
-    "optional_slots": ["location", "merchant"],
+    "optional_slots": ["location", "merchant", "login_email"],
     "clarification_templates": {
       "txn_id": "What is the transaction ID for the unauthorized charge?",
       "device": "Which device was used?",
       "date": "When did this happen?",
       "location": "Where were you when this occurred?",
-      "merchant": "Which merchant or payee is involved?"
+      "merchant": "Which merchant or payee is involved?",
+      "login_email": "Which PayPal email is on the account where you see the unauthorized charge?"
     }
   },
   {
@@ -165,6 +168,217 @@
       "txn_id": "What is the transaction ID for the latest charge?",
       "reason": "Why do you want to cancel the subscription?",
       "next_bill_date": "When is the next billing date?"
+    }
+  },
+  {
+    "intent_id": "PPA.Payments.Withdrawals.Delayed",
+    "path": ["PPA", "Payments", "Withdrawals", "Delayed"],
+    "description": "withdrawal or transfer to bank pending or delayed",
+    "required_slots": ["txn_id", "bank_name", "date"],
+    "optional_slots": ["amount", "currency", "device"],
+    "clarification_templates": {
+      "txn_id": "What is the transaction ID for the withdrawal?",
+      "bank_name": "Which bank were you transferring to?",
+      "date": "When did you start the withdrawal?",
+      "amount": "How much were you withdrawing?",
+      "currency": "Which currency was the withdrawal in?",
+      "device": "Were you on mobile or web when you initiated it?"
+    }
+  },
+  {
+    "intent_id": "PPA.Payments.PayLater.LimitIncrease",
+    "path": ["PPA", "Payments", "PayLater", "LimitIncrease"],
+    "description": "request to increase Pay Later spending limit",
+    "required_slots": ["amount", "reason"],
+    "optional_slots": ["date", "device"],
+    "clarification_templates": {
+      "amount": "What new limit are you requesting?",
+      "reason": "Why do you need a higher limit?",
+      "date": "When do you need this increase by?",
+      "device": "Are you applying on mobile or web?"
+    }
+  },
+  {
+    "intent_id": "PPA.Account.Profile.UpdateName",
+    "path": ["PPA", "Account", "Profile", "UpdateName"],
+    "description": "change the account profile or business name",
+    "required_slots": ["login_email", "reason"],
+    "optional_slots": ["date", "device"],
+    "clarification_templates": {
+      "login_email": "Which PayPal email is on the account?",
+      "reason": "Why are you changing the account name?",
+      "date": "When did you notice the name needs updating?",
+      "device": "Are you trying to update on mobile or web?"
+    }
+  },
+  {
+    "intent_id": "PPA.Payments.TransferToBank.Failed",
+    "path": ["PPA", "Payments", "TransferToBank", "Failed"],
+    "description": "failed transfer from balance to bank",
+    "required_slots": ["amount", "bank_name", "error_message"],
+    "optional_slots": ["currency", "date", "txn_id"],
+    "clarification_templates": {
+      "amount": "How much were you transferring to the bank?",
+      "bank_name": "Which bank were you sending the money to?",
+      "error_message": "What error message did you see?",
+      "currency": "In which currency was the transfer?",
+      "date": "When did you attempt the transfer?",
+      "txn_id": "What is the transaction ID for the transfer that failed?"
+    }
+  },
+  {
+    "intent_id": "PPA.Disputes.RecurringCharge",
+    "path": ["PPA", "Disputes", "BillingIssues", "RecurringCharge"],
+    "description": "unexpected recurring or duplicate subscription charge",
+    "required_slots": ["txn_id", "merchant", "date"],
+    "optional_slots": ["reason", "amount"],
+    "clarification_templates": {
+      "txn_id": "What is the transaction ID for the latest charge?",
+      "merchant": "Which merchant is billing you?",
+      "date": "When did the recurring charge occur?",
+      "reason": "Why do you believe this charge is unexpected?",
+      "amount": "How much was the recurring charge?"
+    }
+  },
+  {
+    "intent_id": "PPA.Refunds.BuyerRefunds.RefundStatus",
+    "path": ["PPA", "Refunds", "BuyerRefunds", "RefundStatus"],
+    "description": "status of a previously issued refund",
+    "required_slots": ["txn_id"],
+    "optional_slots": ["amount", "currency", "original_payment_date"],
+    "clarification_templates": {
+      "txn_id": "What is the PayPal transaction ID related to the refund?",
+      "amount": "How much was the refund for?",
+      "currency": "Which currency was the refund in?",
+      "original_payment_date": "When was the original payment made?"
+    }
+  },
+  {
+    "intent_id": "PPA.Disputes.ItemIssues.DamagedItem",
+    "path": ["PPA", "Disputes", "ItemIssues", "DamagedItem"],
+    "description": "item received damaged or broken",
+    "required_slots": ["txn_id", "issue_detail"],
+    "optional_slots": ["photos", "seller", "resolution_preference"],
+    "clarification_templates": {
+      "txn_id": "What is the transaction ID for this purchase?",
+      "issue_detail": "What kind of damage did the item arrive with?",
+      "photos": "Can you share photos showing the damage?",
+      "seller": "Who was the seller or site?",
+      "resolution_preference": "Do you prefer a refund, replacement, or store credit?"
+    }
+  },
+  {
+    "intent_id": "PPA.Disputes.ItemIssues.WrongItemReceived",
+    "path": ["PPA", "Disputes", "ItemIssues", "WrongItemReceived"],
+    "description": "wrong item received instead of what was ordered",
+    "required_slots": ["txn_id", "issue_detail"],
+    "optional_slots": ["photos", "seller", "resolution_preference"],
+    "clarification_templates": {
+      "txn_id": "What is the transaction ID for this order?",
+      "issue_detail": "What did you receive versus what you ordered?",
+      "photos": "Can you share photos of the item you received?",
+      "seller": "Who was the seller or marketplace?",
+      "resolution_preference": "Do you prefer a refund, replacement, or store credit?"
+    }
+  },
+  {
+    "intent_id": "PPA.Payments.PayLater.PaymentDeclined",
+    "path": ["PPA", "Payments", "PayLater", "PaymentDeclined"],
+    "description": "Pay Later payment or authorization declined",
+    "required_slots": ["amount", "merchant", "error_message"],
+    "optional_slots": ["device", "date"],
+    "clarification_templates": {
+      "amount": "What was the purchase amount when Pay Later was declined?",
+      "merchant": "Which merchant were you trying to pay with Pay Later?",
+      "error_message": "What error message did you see when it was declined?",
+      "device": "Were you on mobile or web?",
+      "date": "When did this Pay Later payment get declined?"
+    }
+  },
+  {
+    "intent_id": "PPA.Payments.Checkout.CardDeclined",
+    "path": ["PPA", "Payments", "Checkout", "CardDeclined"],
+    "description": "card declined at merchant checkout",
+    "required_slots": ["amount", "merchant", "card_last4", "error_message"],
+    "optional_slots": ["device", "date", "issuer"],
+    "clarification_templates": {
+      "amount": "What was the payment amount when the card was declined?",
+      "merchant": "Which merchant were you trying to pay?",
+      "card_last4": "What are the last four digits of the card?",
+      "error_message": "What error message did you see at checkout?",
+      "device": "Were you paying on mobile or web?",
+      "date": "When did this decline happen?",
+      "issuer": "Which bank issued the card?"
+    }
+  },
+  {
+    "intent_id": "PPA.Account.Access.Limited",
+    "path": ["PPA", "Account", "Access", "Limited"],
+    "description": "account access limited due to a review or policy restriction",
+    "required_slots": ["login_email", "date"],
+    "optional_slots": ["reason", "location"],
+    "clarification_templates": {
+      "login_email": "Which PayPal email is on the limited account?",
+      "date": "When did you first see the account limitation?",
+      "reason": "What message did you see about why the account is limited?",
+      "location": "Where were you logging in from when you noticed this?"
+    }
+  },
+  {
+    "intent_id": "PPA.Account.Profile.UpdateAddress",
+    "path": ["PPA", "Account", "Profile", "UpdateAddress"],
+    "description": "update billing, shipping, or business address on the account",
+    "required_slots": ["login_email", "address_type", "country"],
+    "optional_slots": ["date", "device"],
+    "clarification_templates": {
+      "login_email": "Which PayPal email is on the account?",
+      "address_type": "Which address do you want to update (billing/shipping/business)?",
+      "country": "Which country is the new address in?",
+      "date": "When did you notice the address needs updating?",
+      "device": "Are you trying to update on mobile or web?"
+    }
+  },
+  {
+    "intent_id": "PPA.Account.Security.SuspectedCompromise",
+    "path": ["PPA", "Account", "Security", "SuspectedCompromise"],
+    "description": "suspicious activity or suspected account compromise",
+    "required_slots": ["login_email", "device", "date"],
+    "optional_slots": ["location", "observed_issue"],
+    "clarification_templates": {
+      "login_email": "Which PayPal email is on the account you’re worried about?",
+      "device": "Which device were you using when you noticed something suspicious?",
+      "date": "When did you notice the suspicious activity?",
+      "location": "Where were you logging in from at that time?",
+      "observed_issue": "What exactly did you notice (e.g. unknown payments, login alerts)?"
+    }
+  },
+  {
+    "intent_id": "PPA.Payments.Withdrawals.Reversed",
+    "path": ["PPA", "Payments", "Withdrawals", "Reversed"],
+    "description": "withdrawal or transfer to bank reversed or returned to balance",
+    "required_slots": ["txn_id", "bank_name", "date"],
+    "optional_slots": ["amount", "currency", "reason"],
+    "clarification_templates": {
+      "txn_id": "What is the transaction ID for the withdrawal that was reversed?",
+      "bank_name": "Which bank were you transferring to?",
+      "date": "When was the withdrawal initiated?",
+      "amount": "How much was the withdrawal for?",
+      "currency": "Which currency was the withdrawal in?",
+      "reason": "What message did you see about why it was reversed?"
+    }
+  },
+  {
+    "intent_id": "PPA.Payments.Subscriptions.ChangePlan",
+    "path": ["PPA", "Payments", "Subscriptions", "ChangePlan"],
+    "description": "change a subscription plan, amount, or billing frequency",
+    "required_slots": ["merchant", "current_plan", "desired_change"],
+    "optional_slots": ["next_bill_date", "reason"],
+    "clarification_templates": {
+      "merchant": "Which merchant or service is the subscription with?",
+      "current_plan": "What is your current plan or billing amount?",
+      "desired_change": "How do you want to change the plan (amount/frequency/tiers)?",
+      "next_bill_date": "When is the next billing date?",
+      "reason": "Why do you want to change this subscription?"
     }
   }
 ]

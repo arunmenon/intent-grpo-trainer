@@ -10,6 +10,7 @@ import json
 from typing import Dict, List
 
 SYNTHETIC_KG_PATH = Path(__file__).with_suffix(".json")
+MULTI_PATTERNS_PATH = Path(__file__).with_name("multi_intent_patterns.json")
 
 
 def load_synthetic_intents() -> List[dict]:
@@ -22,3 +23,10 @@ SYNTHETIC_INTENTS: List[dict] = load_synthetic_intents()
 
 def intent_index_by_id() -> Dict[str, dict]:
     return {intent["intent_id"]: intent for intent in SYNTHETIC_INTENTS}
+
+
+def load_multi_intent_patterns() -> List[dict]:
+    if not MULTI_PATTERNS_PATH.exists():
+        return []
+    with MULTI_PATTERNS_PATH.open("r", encoding="utf-8") as f:
+        return json.load(f)
