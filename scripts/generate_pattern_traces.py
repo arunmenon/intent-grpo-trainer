@@ -33,7 +33,9 @@ sys.path.append(str(EXAMPLES_DIR))
 from synthetic_kg import load_multi_intent_patterns, load_synthetic_intents  # type: ignore
 from generate_multi_turn_conversations import (  # type: ignore
     LLMGenerator,
+    PERSONAS,
     conversation_template_multi,
+    conversation_template_tri,
 )
 
 
@@ -55,16 +57,18 @@ def normalize_patterns(patterns: List[dict], intent_index: Dict[str, dict]) -> L
     return out
 
 
-def _build_conversation(idx: int, pattern: dict, intent_index: Dict[str, dict], llm: LLMGenerator | None) -> dict:
+def _build_conversation(
+    idx: int, pattern: dict, intent_index: Dict[str, dict], llm: LLMGenerator | None, persona: dict | None
+) -> dict:
     comp = pattern["component_intents"]
     if len(comp) == 2:
         intent_a = intent_index[comp[0]]
         intent_b = intent_index[comp[1]]
-        return conversation_template_multi(intent_a, intent_b, idx, llm)
+        return conversation_template_multi(intent_a, intent_b, idx, llm, persona)
     intent_a = intent_index[comp[0]]
     intent_b = intent_index[comp[1]]
     intent_c = intent_index[comp[2]]
-    return conversation_template_tri(intent_a, intent_b, intent_c, idx, llm)
+    return conversation_template_tri(intent_a, intent_b, intent_c, idx, llm, persona)
 
 
 def cycle_patterns(
@@ -75,6 +79,7 @@ def cycle_patterns(
     log_every: int = 0,
     workers: int = 1,
     tri_ratio: float = 0.0,
+    persona: dict | None = None,
 ) -> List[dict]:
     """Evenly cycle through patterns (two-intent only) and build conversations until reaching count."""
     if not patterns:
@@ -108,7 +113,7 @@ def cycle_patterns(
     if workers and workers > 1:
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
             future_map = {
-                executor.submit(_build_conversation, t_idx, pat, intent_index, llm): t_idx for t_idx, pat in tasks
+                executor.submit(_build_conversation, t_idx, pat, intent_index, llm, persona): t_idx for t_idx, pat in tasks
             }
             for i, fut in enumerate(concurrent.futures.as_completed(future_map), 1):
                 conversations.append(fut.result())
@@ -117,7 +122,7 @@ def cycle_patterns(
         conversations.sort(key=lambda c: c.get("conversation_id", ""))
     else:
         for i, (t_idx, pat) in enumerate(tasks, 1):
-            conversations.append(_build_conversation(t_idx, pat, intent_index, llm))
+            conversations.append(_build_conversation(t_idx, pat, intent_index, llm, persona))
             if log_every and i % log_every == 0:
                 print(f"[gen] built {i}/{len(tasks)} conversations...", flush=True)
 
@@ -146,6 +151,8 @@ def main() -> None:
     parser.add_argument("--log-every", type=int, default=50, help="Print progress every N conversations (0 to disable).")
     parser.add_argument("--workers", type=int, default=1, help="Number of threads for generation (template + tool planning only; LLM is threadsafe).")
     parser.add_argument("--tri-ratio", type=float, default=0.05, help="Probability of sampling a tri-intent pattern (if any exist).")
+    parser.add_argument("--persona", type=str, default="concise_support", help="Persona id to apply (see PERSONAS).")
+    parser.add_argument("--persona-random", action="store_true", help="Pick a random persona from PERSONAS.")
     args = parser.parse_args()
 
     random.seed(args.seed)
@@ -177,7 +184,15 @@ def main() -> None:
     if not patterns:
         raise SystemExit("No valid patterns found (need at least two intents per pattern and all intents present).")
 
-    conversations = cycle_patterns(patterns, intents, args.count, llm, log_every=args.log_every, workers=args.workers)
+    persona = None
+    if args.persona_random:
+        persona = random.choice(list(PERSONAS.values()))
+    else:
+        persona = PERSONAS.get(args.persona, PERSONAS.get("concise_support"))
+
+    conversations = cycle_patterns(
+        patterns, intents, args.count, llm, log_every=args.log_every, workers=args.workers, tri_ratio=args.tri_ratio, persona=persona
+    )
     save_jsonl(conversations, args.output)
     print(f"Wrote {len(conversations)} conversations to {args.output}")
 

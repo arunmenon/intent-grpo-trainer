@@ -29,6 +29,25 @@ SYSTEM_PROMPT = (
     "Be concise, ask for missing details, and summarize outcomes."
 )
 
+# Simple persona/trait vectors. Keep lightweight and human-readable.
+PERSONAS: Dict[str, Dict[str, object]] = {
+    "concise_support": {
+        "description": "Concise PPA consumer support agent; balances empathy with brevity.",
+        "traits": {"tone": "concise", "verbosity": "low", "empathy": "medium", "formality": "medium", "domain": "PPA consumer support"},
+        "scenario": "default",
+    },
+    "reassuring_guide": {
+        "description": "Warm, reassuring guide; adds brief reassurance while staying on-task.",
+        "traits": {"tone": "reassuring", "verbosity": "medium", "empathy": "high", "formality": "low", "domain": "PPA consumer support"},
+        "scenario": "anxious user",
+    },
+    "strict_ops": {
+        "description": "Strict operations style; direct instructions, minimal small talk.",
+        "traits": {"tone": "direct", "verbosity": "low", "empathy": "low", "formality": "high", "domain": "PPA compliance/ops"},
+        "scenario": "policy-focused",
+    },
+}
+
 # Lightweight phrasing helpers.
 SLOT_TEMPLATES: Dict[str, str] = {
     "amount": "It was for {value}.",
@@ -241,6 +260,24 @@ def make_step(
 def make_tool_plan(steps: List[Dict[str, object]], strategy: str = "sequential") -> Dict[str, object]:
     sorted_steps = sorted(steps, key=lambda s: s.get("order", 0))
     return {"strategy": strategy, "steps": sorted_steps}
+
+
+def apply_persona_to_system_prompt(persona: Optional[Dict[str, object]]) -> str:
+    if not persona:
+        return SYSTEM_PROMPT
+    traits = persona.get("traits", {})
+    trait_str = ", ".join(f"{k}: {v}" for k, v in traits.items()) if isinstance(traits, dict) else ""
+    desc = persona.get("description", "")
+    scenario = persona.get("scenario")
+    parts = [SYSTEM_PROMPT]
+    if desc:
+        parts.append(f"Persona: {desc}.")
+    if trait_str:
+        parts.append(f"Traits: {trait_str}.")
+    if scenario:
+        parts.append(f"Scenario: {scenario}.")
+    parts.append("Respond in line with these traits.")
+    return " ".join(parts)
 
 
 class LLMGenerator:
@@ -509,7 +546,7 @@ def show_to_user(call_id: str, message: str, focus_intents: List[str]) -> dict:
     }
 
 
-def conversation_template_single(intent: dict, idx: int, llm: Optional[LLMGenerator]) -> dict:
+def conversation_template_single(intent: dict, idx: int, llm: Optional[LLMGenerator], persona: Optional[Dict[str, object]] = None) -> dict:
     slots = choose_slots(intent)
     all_slots = {**slots.present, **slots.missing}
     tool_name = default_tool(intent["intent_id"])
@@ -521,7 +558,7 @@ def conversation_template_single(intent: dict, idx: int, llm: Optional[LLMGenera
         else build_user_message(intent["description"], slots.present)
     )
     messages: List[dict] = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": apply_persona_to_system_prompt(persona)},
         {"role": "user", "content": user_opening},
         assistant_message(
             content=(
@@ -709,7 +746,7 @@ def conversation_template_single(intent: dict, idx: int, llm: Optional[LLMGenera
     }
 
 
-def conversation_template_multi(intent_a: dict, intent_b: dict, idx: int, llm: Optional[LLMGenerator]) -> dict:
+def conversation_template_multi(intent_a: dict, intent_b: dict, idx: int, llm: Optional[LLMGenerator], persona: Optional[Dict[str, object]] = None) -> dict:
     slots_a = choose_slots(intent_a)
     slots_b = choose_slots(intent_b)
     all_slots_a = {**slots_a.present, **slots_a.missing}
@@ -736,7 +773,7 @@ def conversation_template_multi(intent_a: dict, intent_b: dict, idx: int, llm: O
         )
     )
     messages: List[dict] = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": apply_persona_to_system_prompt(persona)},
         {
             "role": "user",
             "content": user_opening,
@@ -998,7 +1035,7 @@ def conversation_template_multi(intent_a: dict, intent_b: dict, idx: int, llm: O
     }
 
 
-def conversation_template_tri(intent_a: dict, intent_b: dict, intent_c: dict, idx: int, llm: Optional[LLMGenerator]) -> dict:
+def conversation_template_tri(intent_a: dict, intent_b: dict, intent_c: dict, idx: int, llm: Optional[LLMGenerator], persona: Optional[Dict[str, object]] = None) -> dict:
     slots_a = choose_slots(intent_a)
     slots_b = choose_slots(intent_b)
     slots_c = choose_slots(intent_c)
@@ -1028,7 +1065,7 @@ def conversation_template_tri(intent_a: dict, intent_b: dict, intent_c: dict, id
         )
     )
     messages: List[dict] = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": apply_persona_to_system_prompt(persona)},
         {"role": "user", "content": user_opening},
         assistant_message(
             content=(
@@ -1390,16 +1427,16 @@ def conversation_template_tri(intent_a: dict, intent_b: dict, intent_c: dict, id
     }
 
 
-def generate_conversations(count: int, multi_ratio: float, llm: Optional[LLMGenerator]) -> List[dict]:
+def generate_conversations(count: int, multi_ratio: float, llm: Optional[LLMGenerator], persona: Optional[Dict[str, object]]) -> List[dict]:
     conversations: List[dict] = []
     for idx in range(count):
         is_multi = random.random() < multi_ratio
         if is_multi and len(SYNTHETIC_INTENTS) >= 2:
             a, b = choose_intent_pair()
-            conversations.append(conversation_template_multi(a, b, idx, llm))
+            conversations.append(conversation_template_multi(a, b, idx, llm, persona))
         else:
             intent = random.choice(SYNTHETIC_INTENTS)
-            conversations.append(conversation_template_single(intent, idx, llm))
+            conversations.append(conversation_template_single(intent, idx, llm, persona))
     return conversations
 
 
@@ -1423,6 +1460,8 @@ def main() -> None:
     parser.add_argument("--llm-temperature", type=float, default=0.8, help="LLM temperature.")
     parser.add_argument("--llm-max-tokens", type=int, default=80, help="Max tokens for LLM completion.")
     parser.add_argument("--no-llm-drop-params", action="store_false", dest="llm_drop_params", help="Keep unsupported params instead of dropping them.")
+    parser.add_argument("--persona", type=str, default="concise_support", help="Persona id to apply (see PERSONAS).")
+    parser.add_argument("--persona-random", action="store_true", help="Pick a random persona from PERSONAS.")
     args = parser.parse_args()
 
     random.seed(args.seed)
@@ -1443,7 +1482,13 @@ def main() -> None:
         except Exception as exc:
             raise SystemExit(f"Failed to initialize LLM generator: {exc}") from exc
 
-    conversations = generate_conversations(args.count, args.multi_ratio, llm)
+    persona: Optional[Dict[str, object]] = None
+    if args.persona_random:
+        persona = random.choice(list(PERSONAS.values()))
+    else:
+        persona = PERSONAS.get(args.persona, PERSONAS.get("concise_support"))
+
+    conversations = generate_conversations(args.count, args.multi_ratio, llm, persona)
     save_jsonl(conversations, args.output)
     print(f"Wrote {len(conversations)} conversations to {args.output}")
 
